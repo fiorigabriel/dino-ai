@@ -65,17 +65,15 @@ class DinoGameEnv(gym.Env):
     return self.driver.execute_script("""const getNextObstacle = () => {
       const { obstacles } = Runner.instance_.horizon;
 
-      if (!obstacles.length) return null;
-
       const obstacle = obstacles[0];
 
       return {
-        gap: obstacle.gap || -1, // distance between the next object
-        size: obstacle.size || -1,
-        xPos: obstacle.xPos || -1,
-        yPos: obstacle.yPos || -1,
-        height: obstacle.typeConfig.height || -1,
-        width: obstacle.typeConfig.width || -1,
+        gap: obstacle?.gap || -1, // distance between the next object
+        size: obstacle?.size || -1,
+        xPos: obstacle?.xPos || -1,
+        yPos: obstacle?.yPos || -1,
+        height: obstacle?.typeConfig.height || -1,
+        width: obstacle?.typeConfig.width || -1,
       };
     };
     
