@@ -9,11 +9,12 @@ from selenium.webdriver.common.keys import Keys
 
 
 class DinoGameEnv(gym.Env):
-  def __init__(self, headless=True):
+  def __init__(self, vec_env_id=0, headless=True):
     # 0 = do nothing, 1 = jump, 2 = duck
     self.action_space = spaces.Discrete(3)
-    self.observation_space = spaces.Box(low=-50, high=np.inf, shape=(9,), dtype=np.float32)
+    self.observation_space = spaces.Box(low=-50, high=1000, shape=(8,), dtype=np.float32)
     self.headless = headless
+    self.vec_env_id = vec_env_id
     self._setupWebdriver()
 
   def step(self, action):
@@ -32,9 +33,8 @@ class DinoGameEnv(gym.Env):
 
 
   def reset(self):
-    self.driver.execute_script("Runner.instance_.stop()")
-    self.driver.execute_script("Runner.instance_.restart()")
-    self.get_observation()
+    self._restartGame()
+    return self.get_observation()
 
   def get_observation(self):
     return self._getGameObservation()
@@ -59,6 +59,7 @@ class DinoGameEnv(gym.Env):
     # needs to be in try/except block otherwise it won't start the game
     try:
       self.driver.get('chrome://dino')
+      # self.driver.get('https://offline-dino-game.firebaseapp.com/')
     except WebDriverException:
       pass
 
@@ -72,10 +73,8 @@ class DinoGameEnv(gym.Env):
       const { tRex } = Runner.instance_;
 
       return {
-        xPos: tRex.xPos,
-        yPos: tRex.yPos,
-        isJumping: tRex.jumping,
-        isDucking: tRex.ducking,
+        xPos: tRex?.xPos || -1,
+        yPos: tRex?.yPos || -1
       };
     };
 
@@ -100,17 +99,42 @@ class DinoGameEnv(gym.Env):
     return getNextObstacle();"""
     )
 
-  def _getCurrentSpeed(self):
-    return self.driver.execute_script("Runner.instance_.currentSpeed.toFixed(4);")
+  def _getCurrentSpeed(self) -> float:
+    speed = self.driver.execute_script("""const getCurrentSpeed = () => {
+      if (!Runner || !Runner.instance_ || !Runner.instance_.currentSpeed) {
+        return -1;
+      }
+
+      return Runner.instance_.currentSpeed.toFixed(3).toString();
+    }
+    return getCurrentSpeed();
+    """)
+
+    if (speed == None):
+      return -1
+    return float(speed)
+  
+  def _restartGame(self):
+    return self.driver.execute_script("""
+      const restartGame = () => {
+        Runner.instance_.stop();
+        try {
+          Runner.instance_.restart();
+        } catch (error) {
+          console.log("useless error = ", error);
+        }
+      }
+
+      return restartGame();
+    """)
 
   def _getGameObservation(self):
     trex = self._getTrexInfo()
     current_speed = self._getCurrentSpeed()
     next_obstacle = self._getNextObstacle()
 
-
     return [
-      trex["xPos"],
+      # trex["xPos"], # apparently it's always 0, so not needed
       trex["yPos"],
       current_speed,
       next_obstacle["gap"],
